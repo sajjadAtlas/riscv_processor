@@ -1,0 +1,107 @@
+$date
+	Mon Aug 19 21:38:20 2024
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1ns
+$end
+$scope module ProgramCounter_tb $end
+$var wire 32 ! PC [31:0] $end
+$var reg 1 " clk $end
+$var reg 32 # nextPC [31:0] $end
+$var reg 1 $ reset $end
+$scope module pc1 $end
+$var wire 1 " clk $end
+$var wire 32 % nextPC [31:0] $end
+$var wire 1 $ reset $end
+$var reg 32 & PC [31:0] $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$comment Show the parameter values. $end
+$dumpall
+$end
+#0
+$dumpvars
+b0 &
+b0 %
+1$
+b0 #
+0"
+b0 !
+$end
+#5
+1"
+#10
+0"
+b100 #
+b100 %
+0$
+#15
+b100 !
+b100 &
+1"
+#20
+0"
+b1000 #
+b1000 %
+#25
+b1000 !
+b1000 &
+1"
+#30
+b0 !
+b0 &
+0"
+1$
+#35
+1"
+#40
+0"
+b1100 #
+b1100 %
+0$
+#45
+b1100 !
+b1100 &
+1"
+#50
+0"
+#55
+1"
+#60
+0"
+#65
+1"
+#70
+0"
+#75
+1"
+#80
+0"
+#85
+1"
+#90
+0"
+#95
+1"
+#100
+0"
+#105
+1"
+#110
+0"
+#115
+1"
+#120
+0"
+#125
+1"
+#130
+0"
+#135
+1"
+#140
+0"
