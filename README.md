@@ -1,5 +1,5 @@
 This project is a pipelined RISCV-V processor implementing the 32-bit instruction set. It's meant as an exercise for learning verilog as well as processor design and generally computer architecture. It's definitely a work in progress,
-it needs to be tested a lot more for bugs. I want to add branch prediction as well, that would be cool to implement. I need to test the branching/jump instructions a bit more.
+; I want to add branch prediction for example, that would be cool to implement. I need to test the branching/jump instructions a bit more.
 
 
 
