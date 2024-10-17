@@ -1,158 +1,156 @@
 module PipelinedProcessor (
     input clock,
-    input reset,
-    output [31:0] pc
+    input reset
 );
-    wire [31:0] instruction;
-    wire [31:0] pc_next;
-    wire [31:0] regData1, regData2;
-    wire [4:0] rd;
-    wire [31:0] writeData;
-    wire regWrite;
-    
-    wire load, store, branch, JAL, JALR, AUIPC, aluSrc;
-    wire [4:0] aluCtrl;
-    wire [31:0] imm;
 
-// pipeline registers
-    reg [31:0] IF_ID_instruction;
-    reg [31:0] IF_ID_pc;
-    reg [4:0] ID_EX_rd;
-    reg [31:0] ID_EX_regData1, ID_EX_regData2, ID_EX_imm;
-    reg ID_EX_load, ID_EX_store, ID_EX_branch, ID_EX_JAL, ID_EX_JALR, ID_EX_AUIPC, ID_EX_aluSrc;
-    reg [4:0] ID_EX_aluCtrl;
     
-    wire [31:0] aluResult;
-    wire branchTaken;
+    wire [31:0] instruction_IF, instruction_ID;
+    wire [31:0] PC_IF, PC_ID, PC_EX, nextPC_ID, nextPC_EX;
+    wire [31:0] imm_ID, imm_EX;
+    wire [31:0] regData1_ID, regData2_ID, regData1_EX, regData2_EX;
+    wire [31:0] aluResult_EX, aluResult_MEM;
+    wire [31:0] writeData_WB;
+    wire [4:0] rd_ID, rd_EX;
+    wire load_ID, store_ID, regWrite_ID, branch_ID;
+    wire JAL_ID, JALR_ID, AUIPC_ID;
+    wire branchTaken_EX;
 
-    reg [31:0] pc_reg;
+  
+    reg [31:0] PC;
     always @(posedge clock or posedge reset) begin
-        if (reset) begin
-            pc_reg <= 32'b0;
-        end else begin
-            pc_reg <= pc_next; // Update PC to next value
+        if (reset)
+            PC <= 32'b0; 
+        else
+            PC <= nextPC_EX; 
+    end
+
+    instr_mem IM(
+        .address(PC),
+        .instruction(instruction_IF)
+    );
+
+    always @(posedge clock) begin
+        if (!reset) begin
+            PC_IF <= PC; 
         end
     end
 
-    assign pc = pc_reg;
+   
+    reg [31:0] instruction_ID_reg;
+    reg [31:0] PC_ID_reg;
+    
+    always @(posedge clock) begin
+        if (!reset) begin
+            instruction_ID_reg <= instruction_IF;
+            PC_ID_reg <= PC_IF;
+        end
+    end
 
-    InstructionMemory inst_mem(
-        .address(pc_reg),
-        .data(instruction)
+    main_decoder decoder(
+        .instruction(instruction_ID_reg),
+        .aluCtrl(aluCtrl),
+        .load(load_ID),
+        .store(store_ID),
+        .branch(branch_ID),
+        .regWrite(regWrite_ID),
+        .aluSrc(aluSrc),
+        .JAL(JAL_ID),
+        .JALR(JALR_ID),
+        .AUIPC(AUIPC_ID),
+        .funct3(funct3),
+        .funct7(funct7),
+        .rd(rd_ID),
+        .imm(imm_ID)
     );
 
-    // Register File
-    RegisterFile reg_file(
+    RegisterFile regFile(
         .clock(clock),
         .reset(reset),
-        .write(regWrite),
-        .rs1(IF_ID_instruction[19:15]), // source 1
-        .rs2(IF_ID_instruction[24:20]), // source 2
-        .rd(rd),                         // destination
-        .writeData(writeData),           // data to write
-        .regData1(regData1),             // dutput for rs1
-        .regData2(regData2)              // dutput for rs2
+        .write(regWrite_ID),
+        .rs1(instruction_ID_reg[19:15]),
+        .rs2(instruction_ID_reg[24:20]),
+        .rd(rd_ID),
+        .writeData(writeData_WB),
+        .regData1(regData1_ID),
+        .regData2(regData2_ID)
     );
 
-    // Control Unit (Decoder)
-    main_decoder decoder(
-        .instruction(IF_ID_instruction),
-        .aluCtrl(aluCtrl),
-        .load(load),
-        .store(store),
-        .branch(branch),
-        .regWrite(regWrite),
-        .aluSrc(aluSrc),
-        .JAL(JAL),
-        .JALR(JALR),
-        .AUIPC(AUIPC),
-        .opCode(),
-        .funct7(),
-        .funct3(),
-        .rs1(),
-        .rs2(),
-        .rd(rd),
-        .imm(imm)
-    );
+   
+    reg [31:0] imm_EX_reg;
+    reg [31:0] regData1_EX_reg, regData2_EX_reg;
+    reg [4:0] rd_EX_reg;
+    reg load_EX, store_EX, regWrite_EX, JAL_EX, JALR_EX, AUIPC_EX;
 
-    // IF Stage
-    always @(posedge clock or posedge reset) begin
-        if (reset) begin
-            IF_ID_instruction <= 32'b0;
-            IF_ID_pc <= 32'b0;
-        end else begin
-            IF_ID_instruction <= instruction; // fetch instruction
-            IF_ID_pc <= pc_reg;                // store PC value
-        end
-    end
-
-    // ID Stage
-    always @(posedge clock or posedge reset) begin
-        if (reset) begin
-            ID_EX_rd <= 5'b0;
-            ID_EX_regData1 <= 32'b0;
-            ID_EX_regData2 <= 32'b0;
-            ID_EX_imm <= 32'b0;
-            ID_EX_load <= 0;
-            ID_EX_store <= 0;
-            ID_EX_branch <= 0;
-            ID_EX_JAL <= 0;
-            ID_EX_JALR <= 0;
-            ID_EX_AUIPC <= 0;
-            ID_EX_aluSrc <= 0;
-            ID_EX_aluCtrl <= 5'b0;
-        end else begin
-            ID_EX_rd <= rd;                     // rd for the EX stage
-            ID_EX_regData1 <= regData1;        // source register 1 data
-            ID_EX_regData2 <= regData2;        // source register 2 data
-            ID_EX_imm <= imm;                   // immediate value
-            ID_EX_load <= load;                 // load control signal
-            ID_EX_store <= store;               // store control signal
-            ID_EX_branch <= branch;             // branch control signal
-            ID_EX_JAL <= JAL;                   // JAL control signal
-            ID_EX_JALR <= JALR;                 // JALR control signal
-            ID_EX_AUIPC <= AUIPC;               // AUIPC control signal
-            ID_EX_aluSrc <= aluSrc;             // ALU source control signal
-            ID_EX_aluCtrl <= aluCtrl;           // ALU control signals
+    always @(posedge clock) begin
+        if (!reset) begin
+            imm_EX_reg <= imm_ID;
+            regData1_EX_reg <= regData1_ID;
+            regData2_EX_reg <= regData2_ID;
+            rd_EX_reg <= rd_ID;
+            load_EX <= load_ID;
+            store_EX <= store_ID;
+            regWrite_EX <= regWrite_ID;
+            JAL_EX <= JAL_ID;
+            JALR_EX <= JALR_ID;
+            AUIPC_EX <= AUIPC_ID;
         end
     end
 
     
     ALU alu(
-        .operand1(ID_EX_regData1),          
-        .operand2(ID_EX_aluSrc ? ID_EX_imm : ID_EX_regData2), // Source 2 (Immediate if ALU src)
-        .ALUop(ID_EX_aluCtrl),              
-        .funct7(),
-        .funct3(),
-        .branchTaken(branchTaken),           
-        .result(aluResult)                  
+        .operand1(regData1_EX_reg),
+        .operand2(aluSrc ? imm_EX_reg : regData2_EX_reg),
+        .ALUop(aluCtrl),
+        .funct7(funct7),
+        .funct3(funct3),
+        .branchTaken(branchTaken_EX),
+        .result(aluResult_EX)
     );
 
- 
-    always @(posedge clock or posedge reset) begin
-        if (reset) begin
-            writeData <= 32'b0; 
+    
+    always @(*) begin
+        if (branch_ID && branchTaken_EX) begin
+            nextPC_EX = PC_ID_reg + imm_EX_reg; 
+        end else if (JAL_EX) begin
+            nextPC_EX = PC_ID_reg + imm_EX_reg; 
+        end else if (JALR_EX) begin
+            nextPC_EX = (regData1_EX_reg + imm_EX_reg) & 32'b11111111111111111111111111111100; 
         end else begin
-            if (ID_EX_load) begin
-               
-            end else if (ID_EX_store) begin
-                
-            end
-        end
-    end
-
-    always @(posedge clock or posedge reset) begin
-        if (reset) begin
-            writeData <= 32'b0;
-        end else begin
-            if (ID_EX_load) begin
-                writeData <= aluResult; 
-            end else if (ID_EX_JAL || ID_EX_JALR || ID_EX_AUIPC) begin
-                writeData <= pc_next;             end
+            nextPC_EX = PC_ID_reg + 4; 
         end
     end
 
     
-    assign pc_next = pc_reg + (ID_EX_branch && branchTaken ? ID_EX_imm : 4); 
+    reg [31:0] aluResult_MEM_reg;
+    reg [31:0] regData2_MEM_reg;
+    reg load_MEM, store_MEM, regWrite_MEM;
+
+    always @(posedge clock) begin
+        if (!reset) begin
+            aluResult_MEM_reg <= aluResult_EX;
+            regData2_MEM_reg <= regData2_EX_reg;
+            load_MEM <= load_EX;
+            store_MEM <= store_EX;
+            regWrite_MEM <= regWrite_EX;
+        end
+    end
+
+    
+    datamemory DM(
+        .address(aluResult_MEM_reg),
+        .write(store_MEM),
+        .writeData(regData2_MEM_reg),
+        .read(load_MEM),
+        .readData(writeData_WB) 
+    );
+
+    
+    always @(posedge clock) begin
+        if (!reset) begin
+           
+            writeData_WB <= load_MEM ? readData : aluResult_MEM_reg;
+        end
+    end
 
 endmodule
+
